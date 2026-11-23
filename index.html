@@ -1,0 +1,1185 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14181F">
+<title>棋类游戏 · 联机</title>
+<style>
+  :root{
+    --bg:#14181F; --card:#1D232D; --line:#2C3542; --text:#E6EAF0;
+    --muted:#8B97A7; --accent:#D8A04A; --danger:#E0605A; --ok:#5ABF7A;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    overscroll-behavior:none}
+  body{min-height:100vh;display:flex;flex-direction:column;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+
+  header{padding:12px 14px 6px}
+  .row{display:flex;align-items:center;gap:8px}
+  .title{font-size:16px;font-weight:600;letter-spacing:.5px}
+  .room{margin-left:auto;font-size:12.5px;color:var(--accent);border:1px solid rgba(216,160,74,.45);
+    border-radius:999px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+  .room:active{background:rgba(216,160,74,.15)}
+  .status{margin-top:6px;font-size:14px;color:var(--accent)}
+  .sub{margin-top:3px;font-size:11.5px;color:var(--muted);line-height:1.5}
+
+  #boardWrap{flex:1;display:flex;align-items:center;justify-content:center;padding:6px 10px;min-height:0;overflow:hidden}
+  canvas{touch-action:manipulation;border-radius:12px;display:block;max-width:100%}
+
+  footer{padding:6px 10px calc(12px + env(safe-area-inset-bottom))}
+  .btns{display:flex;gap:7px}
+  button{flex:1;background:var(--card);color:var(--text);border:1px solid var(--line);
+    border-radius:11px;padding:12px 6px;font-size:14px;font-family:inherit;cursor:pointer}
+  button:active{background:#26303C}
+  button.primary{background:var(--accent);color:#1A1205;border-color:var(--accent);font-weight:600}
+  button:disabled{opacity:.45}
+
+  /* 弹层 */
+  .mask{position:fixed;inset:0;background:rgba(8,10,14,.72);display:none;
+    align-items:center;justify-content:center;padding:22px;z-index:20}
+  .mask.show{display:flex}
+  .dialog{width:100%;max-width:360px;background:var(--card);border-radius:16px;padding:20px 18px 14px;
+    box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .dialog h3{margin:0 0 10px;font-size:16px}
+  .dialog p{margin:0 0 14px;font-size:13px;color:var(--muted);line-height:1.65}
+  .dialog input{width:100%;background:#232B36;border:1px solid var(--line);border-radius:10px;
+    color:var(--text);font-size:16px;padding:12px;font-family:inherit;letter-spacing:2px;
+    text-transform:uppercase;text-align:center}
+  .dialog .acts{display:flex;gap:8px;margin-top:14px}
+
+  .toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);
+    background:rgba(38,48,60,.96);color:var(--text);font-size:13px;padding:10px 16px;
+    border-radius:10px;opacity:0;transition:opacity .22s;pointer-events:none;z-index:30;max-width:86%}
+  .toast.show{opacity:1}
+
+  #dlRow{text-align:center;padding:2px 8px 8px;font-size:11px;color:var(--muted);line-height:1.7}
+  #dlRow .dlLabel{margin-right:5px;opacity:.85}
+  #dlRow a{color:var(--text);text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+  #dlRow a:active{color:var(--accent)}
+  #dlRow .dlSep{margin:0 5px;opacity:.45}
+
+  .tabs{display:flex;gap:8px;margin:8px 0 2px;flex-wrap:wrap}
+  .tab{flex:0 0 auto;padding:7px 12px;border-radius:9px;border:1px solid var(--line);
+    background:var(--card);color:var(--muted);font-size:12.5px;font-family:inherit;cursor:pointer}
+  .tab.on{background:var(--accent);color:#1A1205;border-color:var(--accent);font-weight:600}
+
+  .hidden{display:none!important}
+  #btnsChess{flex-wrap:wrap}
+  #btnsChess button{flex:1 1 30%;padding:10px 4px;font-size:12.5px;white-space:nowrap}
+  #btnsChess button.wide{flex:1 1 100%}
+
+  /* 象棋历史记录 */
+  .histDlg{max-width:430px;max-height:88vh;display:flex;flex-direction:column;padding:16px 16px 10px}
+  .histHead{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .histHead h3{margin:0;flex:1;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #histClose{flex:0 0 auto;width:32px;padding:4px 0;border-radius:8px;font-size:13px}
+  .histStats{margin:4px 0 8px;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .histList{overflow:auto;-webkit-overflow-scrolling:touch;flex:1 1 auto;min-height:50px;max-height:52vh}
+  .histEmpty{padding:32px 8px;text-align:center;color:var(--muted);font-size:13px;line-height:1.8}
+  .histRow{display:flex;align-items:center;gap:8px;background:#232B36;border:1px solid var(--line);
+    border-radius:10px;padding:9px 10px;margin-bottom:8px;cursor:pointer}
+  .histRow:active{background:#28323F}
+  .histBadge{flex:0 0 auto;width:34px;height:34px;border-radius:8px;background:#1D232D;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .histMain{flex:1;min-width:0}
+  .histMain div:first-child{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .histMain div:last-child{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .histDel{flex:0 0 auto;width:28px;padding:6px;background:none;border:none;color:#5C6878;font-size:14px;cursor:pointer}
+  #histCanvas{display:block;margin:6px auto;max-width:100%;border-radius:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="row">
+    <div class="title" id="appTitle">五子棋 · 联机</div>
+    <div class="room hidden" id="roomChip"></div>
+  </div>
+  <div class="tabs" id="tabs">
+    <button class="tab on" id="tabGomoku">五子棋</button>
+    <button class="tab" id="tabGo">围棋</button>
+    <button class="tab" id="tabChess">象棋</button>
+  </div>
+  <div class="status" id="status">选择一个玩法开始</div>
+  <div class="sub" id="sub">可以让对方开房给你房间号，也可以自己开一间</div>
+</header>
+
+<div id="boardWrap"><canvas id="cv"></canvas></div>
+
+<footer>
+  <div class="btns" id="btns">
+    <button class="primary" id="btnHost">开房</button>
+    <button id="btnJoin">加入房间</button>
+    <button id="btnSize">15 路</button>
+  </div>
+  <div class="btns hidden" id="btnsIn">
+    <button id="btnInvite">复制邀请链接</button>
+    <button id="btnAgain">再来一局</button>
+    <button id="btnLeave">退出</button>
+  </div>
+  <div class="btns hidden" id="btnsGo">
+    <button id="btnPass">弃一手</button>
+    <button id="btnResign">认输</button>
+    <button id="btnScore">数子</button>
+  </div>
+  <div class="btns hidden" id="btnsChess">
+    <button class="primary" id="cNew">新局</button>
+    <button id="cUndo">悔棋</button>
+    <button id="cHint">提示</button>
+    <button id="cLevel">难度 普通</button>
+    <button id="cMode">人机对下</button>
+    <button id="cResign">认输</button>
+    <button id="cHistory" class="wide">历史记录</button>
+  </div>
+</footer>
+
+<div id="dlRow">
+  <span class="dlLabel">下载客户端</span>
+  <a id="apkLink" href="#">安卓 APK</a>
+  <span class="dlSep">·</span>
+  <a id="winLink" href="#">Windows 电脑版</a>
+  <span class="dlSep">·</span>
+  <a id="readmeLink" href="#" target="_blank" rel="noopener">使用说明</a>
+</div>
+
+<div class="mask" id="mask">
+  <div class="dialog">
+    <h3 id="dlgTitle">加入房间</h3>
+    <p id="dlgText">输入对方给你的 6 位房间号</p>
+    <input id="dlgInput" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ABCDEF">
+    <div class="acts">
+      <button id="dlgCancel">取消</button>
+      <button class="primary" id="dlgOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="mask" id="histMask">
+  <div class="dialog histDlg">
+    <div class="histHead">
+      <h3 id="histTitle">象棋 · 历史记录</h3>
+      <button id="histClose">✕</button>
+    </div>
+    <div id="histListView">
+      <p class="histStats" id="histStats"></p>
+      <div class="histList" id="histList"></div>
+      <div class="acts"><button id="histClear">清空全部</button></div>
+    </div>
+    <div id="histReplayView" class="hidden">
+      <p class="histStats" id="histReplayInfo"></p>
+      <canvas id="histCanvas"></canvas>
+      <div class="acts">
+        <button id="histPrev">◀ 上一手</button>
+        <button id="histNext">下一手 ▶</button>
+        <button id="histBack">返回列表</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="go-engine.js"></script>
+<script src="go-ui.js"></script>
+<script src="chess-engine.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ---------- 基础 ----------
+  var params = new URLSearchParams(location.search);
+  var SC = params.get('sharecode') || '';
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+
+  var S = {
+    room: '', token: '', myColor: 0, size: 15, rule: 'loose',
+    game: 'gomoku', scoreMode: false, scoreInfo: null,
+    version: 0, turn: 1, winner: 0, status: '', players: 0,
+    moves: [], inRoom: false, polling: false, busy: false, endShown: false
+  };
+
+  var el = {
+    status: document.getElementById('status'),
+    sub: document.getElementById('sub'),
+    roomChip: document.getElementById('roomChip'),
+    btns: document.getElementById('btns'),
+    btnsIn: document.getElementById('btnsIn'),
+    btnHost: document.getElementById('btnHost'),
+    btnJoin: document.getElementById('btnJoin'),
+    btnSize: document.getElementById('btnSize'),
+    btnInvite: document.getElementById('btnInvite'),
+    btnAgain: document.getElementById('btnAgain'),
+    btnLeave: document.getElementById('btnLeave'),
+    mask: document.getElementById('mask'),
+    dlgTitle: document.getElementById('dlgTitle'),
+    dlgText: document.getElementById('dlgText'),
+    dlgInput: document.getElementById('dlgInput'),
+    dlgOk: document.getElementById('dlgOk'),
+    dlgCancel: document.getElementById('dlgCancel'),
+    apkLink: document.getElementById('apkLink'),
+    winLink: document.getElementById('winLink'),
+    readmeLink: document.getElementById('readmeLink'),
+    dlRow: document.getElementById('dlRow'),
+    toast: document.getElementById('toast'),
+    tabs: document.getElementById('tabs'),
+    tabGomoku: document.getElementById('tabGomoku'),
+    tabGo: document.getElementById('tabGo'),
+    tabChess: document.getElementById('tabChess'),
+    appTitle: document.getElementById('appTitle'),
+    btnsGo: document.getElementById('btnsGo'),
+    btnPass: document.getElementById('btnPass'),
+    btnResign: document.getElementById('btnResign'),
+    btnScore: document.getElementById('btnScore'),
+    btnsChess: document.getElementById('btnsChess'),
+    cNew: document.getElementById('cNew'),
+    cUndo: document.getElementById('cUndo'),
+    cHint: document.getElementById('cHint'),
+    cLevel: document.getElementById('cLevel'),
+    cMode: document.getElementById('cMode'),
+    cResign: document.getElementById('cResign'),
+    cHistory: document.getElementById('cHistory'),
+    histMask: document.getElementById('histMask'),
+    histTitle: document.getElementById('histTitle'),
+    histStats: document.getElementById('histStats'),
+    histList: document.getElementById('histList'),
+    histClear: document.getElementById('histClear'),
+    histListView: document.getElementById('histListView'),
+    histReplayView: document.getElementById('histReplayView'),
+    histReplayInfo: document.getElementById('histReplayInfo'),
+    histCanvas: document.getElementById('histCanvas'),
+    histPrev: document.getElementById('histPrev'),
+    histNext: document.getElementById('histNext'),
+    histBack: document.getElementById('histBack'),
+    histClose: document.getElementById('histClose')
+  };
+
+  var toastTimer = null;
+  function toast(msg) {
+    el.toast.textContent = msg;
+    el.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.toast.classList.remove('show'); }, 2200);
+  }
+
+  function api(path, body) {
+    var url = path + (path.indexOf('?') >= 0 ? '&' : '?') + 'sharecode=' + encodeURIComponent(SC);
+    var opt = { method: body ? 'POST' : 'GET' };
+    if (body) {
+      opt.headers = { 'content-type': 'application/json' };
+      opt.body = JSON.stringify(body);
+    }
+    return fetch(url, opt).then(function (r) { return r.json(); });
+  }
+
+  function errText(code) {
+    var m = {
+      room_not_found: '房间不存在（号码错了，或者房间已过期）',
+      room_full: '房间里已经有两个人了',
+      not_your_turn: '还没轮到你',
+      occupied: '这个位置已经有棋子',
+      game_over: '本局已经结束',
+      not_ready: '对方还没进房间',
+      not_scoring: '双方都停手后才能数子',
+      bad_token: '身份校验失败，请重新加入',
+      seq_mismatch: '步序不同步，正在纠正'
+    };
+    return m[code] || (code || '未知错误');
+  }
+
+  // ---------- 绘制 ----------
+  var side = 320, dpr = window.devicePixelRatio || 1;
+  var chessStarted = false;
+
+  function resize() {
+    var wrap = document.getElementById('boardWrap');
+    var cs2 = getComputedStyle(wrap);
+    var padX = parseFloat(cs2.paddingLeft) + parseFloat(cs2.paddingRight);
+    var padY = parseFloat(cs2.paddingTop) + parseFloat(cs2.paddingBottom);
+    // clientWidth/clientHeight 含 padding，必须减掉，否则棋盘会比可视区宽、被裁掉
+    var availW = wrap.clientWidth - padX - 4;
+    var availH = wrap.clientHeight - padY - 4;
+    side = Math.max(120, Math.floor(Math.min(availW, availH)));
+    cv.width = Math.floor(side * dpr);
+    cv.height = Math.floor(side * dpr);
+    cv.style.width = side + 'px';
+    cv.style.height = side + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function margin() { return side * 0.055; }
+  function cell() { return (side - margin() * 2) / (S.size - 1); }
+  function px(x) { return margin() + x * cell(); }
+  function py(y) { return margin() + y * cell(); }
+
+  function starPoints(n) {
+    var e = n - 4, c = Math.floor(n / 2);
+    if (n >= 19) {
+      return [[3,3],[e,3],[3,e],[e,e],[c,3],[c,e],[3,c],[e,c],[c,c]];
+    }
+    return [[3,3],[e,3],[c,c],[3,e],[e,e]];
+  }
+
+  function roundRectPath(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  function draw() {
+    if (S.game === 'chess') {
+      ChessGame.draw(ctx, side);
+      return;
+    }
+    if (S.game === 'go') {
+      GoUI.sync(S.size, S.moves);
+      GoUI.draw(ctx, side, { scoreMode: S.scoreMode });
+      return;
+    }
+    var n = S.size;
+    var m = margin(), cs = cell();
+
+    ctx.clearRect(0, 0, side, side);
+
+    // 木色底（渐变）
+    roundRectPath(ctx, 0, 0, side, side, side * 0.03);
+    var g = ctx.createLinearGradient(0, 0, side, side);
+    g.addColorStop(0, '#F7DDAD');
+    g.addColorStop(0.55, '#E7C089');
+    g.addColorStop(1, '#D1A35C');
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // 木纹
+    ctx.save();
+    ctx.globalAlpha = 0.10;
+    ctx.strokeStyle = '#78541E';
+    ctx.lineWidth = Math.max(0.8, side / 700);
+    for (var i = 1; i < 14; i++) {
+      var yy = side * i / 14;
+      ctx.beginPath();
+      ctx.moveTo(0, yy);
+      ctx.bezierCurveTo(side * 0.33, yy + side * 0.005, side * 0.66, yy - side * 0.007, side, yy + side * 0.002);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 网格
+    ctx.strokeStyle = 'rgba(108,78,32,0.88)';
+    ctx.lineWidth = Math.max(1, side / 480);
+    for (var k = 0; k < n; k++) {
+      var p = m + k * cs;
+      ctx.beginPath(); ctx.moveTo(m, p); ctx.lineTo(side - m, p); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p, m); ctx.lineTo(p, side - m); ctx.stroke();
+    }
+    ctx.lineWidth = Math.max(1.8, side / 280);
+    ctx.strokeRect(m, m, side - m * 2, side - m * 2);
+
+    // 星位
+    ctx.fillStyle = 'rgba(104,74,30,0.92)';
+    var sp = starPoints(n), sr = Math.max(2, cs * 0.08);
+    sp.forEach(function (s) {
+      ctx.beginPath();
+      ctx.arc(px(s[0]), py(s[1]), sr, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // 棋子
+    var rad = cs * 0.44;
+    S.moves.forEach(function (mv, idx) {
+      drawStone(px(mv[0]), py(mv[1]), rad, mv[2], idx === S.moves.length - 1);
+    });
+
+    // 胜利连线
+    if (S.winner && S.moves.length) {
+      var line = findLine();
+      if (line) {
+        ctx.strokeStyle = 'rgba(224,60,60,0.92)';
+        ctx.lineWidth = Math.max(3, cs * 0.12);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(px(line[0]), py(line[1]));
+        ctx.lineTo(px(line[2]), py(line[3]));
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
+    }
+
+    // 未进房间时盖一层（淡一点，棋盘要还看得清）
+    if (!S.inRoom) {
+      ctx.fillStyle = 'rgba(12,15,20,0.42)';
+      roundRectPath(ctx, 0, 0, side, side, side * 0.03);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,248,232,0.96)';
+      ctx.font = '600 ' + Math.round(side * 0.058) + 'px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('开房 或 输入房间号', side / 2, side / 2 - side * 0.035);
+      ctx.fillStyle = 'rgba(255,244,224,0.75)';
+      ctx.font = Math.round(side * 0.04) + 'px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+      ctx.fillText('两人用同一个房间号就能对下', side / 2, side / 2 + side * 0.048);
+    }
+  }
+
+  function drawStone(x, y, rad, color, isLast) {
+    // 阴影
+    ctx.beginPath();
+    ctx.arc(x + rad * 0.08, y + rad * 0.1, rad, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(90,64,20,0.28)';
+    ctx.fill();
+
+    if (color === 1) {
+      var g = ctx.createRadialGradient(x - rad * 0.32, y - rad * 0.34, rad * 0.12, x, y, rad * 1.15);
+      g.addColorStop(0, '#7A8593');
+      g.addColorStop(0.45, '#2A313A');
+      g.addColorStop(1, '#0A0D11');
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.lineWidth = Math.max(0.8, rad * 0.07);
+      ctx.stroke();
+    } else {
+      var g2 = ctx.createRadialGradient(x - rad * 0.32, y - rad * 0.34, rad * 0.1, x, y, rad * 1.15);
+      g2.addColorStop(0, '#FFFFFF');
+      g2.addColorStop(0.6, '#F0F3F7');
+      g2.addColorStop(1, '#C4CBD5');
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
+      ctx.fillStyle = g2; ctx.fill();
+      ctx.strokeStyle = 'rgba(146,156,170,0.75)';
+      ctx.lineWidth = Math.max(0.9, rad * 0.08);
+      ctx.stroke();
+    }
+
+    if (isLast) {
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(3.5, rad * 0.38), 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(232,78,78,0.95)';
+      ctx.lineWidth = Math.max(1.8, rad * 0.16);
+      ctx.stroke();
+    }
+  }
+
+  function findLine() {
+    if (!S.moves.length) return null;
+    var last = S.moves[S.moves.length - 1];
+    var n = S.size;
+    var grid = {};
+    S.moves.forEach(function (mv) { grid[mv[0] + ',' + mv[1]] = mv[2]; });
+    var dirs = [[1,0],[0,1],[1,1],[1,-1]];
+    for (var d = 0; d < 4; d++) {
+      var dx = dirs[d][0], dy = dirs[d][1];
+      var cnt = 1, ax = last[0], ay = last[1], bx = last[0], by = last[1];
+      while (grid[(ax - dx) + ',' + (ay - dy)] === last[2]) { ax -= dx; ay -= dy; cnt++; }
+      while (grid[(bx + dx) + ',' + (by + dy)] === last[2]) { bx += dx; by += dy; cnt++; }
+      if (cnt >= 5) return [ax, ay, bx, by];
+    }
+    return null;
+  }
+
+  // ---------- 交互 ----------
+  cv.addEventListener('pointerdown', function (e) {
+    if (S.game === 'chess') {
+      var rc = cv.getBoundingClientRect();
+      ChessGame.click(e.clientX - rc.left, e.clientY - rc.top);
+      return;
+    }
+    if (!S.inRoom) { toast('先开房或加入房间'); return; }
+    if (S.status === 'over') { toast('本局已经结束'); return; }
+    if (S.busy) return;
+
+    var rect = cv.getBoundingClientRect();
+    var sx = e.clientX - rect.left;
+    var sy = e.clientY - rect.top;
+
+    if (S.game === 'go') {
+      var hit = GoUI.hit(side, sx, sy);
+      if (!hit) return;
+      var g = GoUI.sync(S.size, S.moves);
+      var i = hit.y * S.size + hit.x;
+      // 数子模式：双方都可以点死子，不受“轮到你”限制
+      if (S.scoreMode) {
+        if (g.board[i] === 0) { toast('只能点棋子标记死子'); return; }
+        if (g.dead[i]) delete g.dead[i]; else g.dead[i] = true;
+        draw();
+        return;
+      }
+      if (S.status === 'scoring') return;
+      if (S.players < 2) { toast('对方还没进房间'); return; }
+      if (S.turn !== S.myColor) { toast('还没轮到你'); return; }
+      if (g.board[i] !== 0) { toast('这个点已经有棋子'); return; }
+      var chk = g.check(hit.x, hit.y);
+      if (chk) { toast(chk); return; }
+      sendMove(hit.x, hit.y);
+      return;
+    }
+
+    if (S.turn !== S.myColor) { toast('还没轮到你'); return; }
+    var cs = cell();
+    var gx = Math.round((sx - margin()) / cs);
+    var gy = Math.round((sy - margin()) / cs);
+    if (gx < 0 || gx >= S.size || gy < 0 || gy >= S.size) return;
+    if (Math.abs(sx - px(gx)) > cs * 0.62 || Math.abs(sy - py(gy)) > cs * 0.62) return;
+    var occupied = S.moves.some(function (mv) { return mv[0] === gx && mv[1] === gy; });
+    if (occupied) return;
+
+    sendMove(gx, gy);
+  });
+
+  function sendMove(x, y) {
+    S.busy = true;
+    setStatus();
+    api('/api/move', { room: S.room, token: S.token, x: x, y: y, seq: S.moves.length })
+      .then(function (s) {
+        S.busy = false;
+        if (s.ok === false) {
+          toast(errText(s.error));
+          if (s.error === 'seq_mismatch' || s.error === 'not_your_turn') refresh();
+          return;
+        }
+        apply(s);
+      })
+      .catch(function (err) {
+        S.busy = false;
+        toast('网络出错：' + err.message);
+      });
+  }
+
+  // ---------- 状态应用 ----------
+  function apply(s) {
+    if (!s || s.ok === false) return;
+    S.room = s.room || S.room;
+    if (s.token) S.token = s.token;
+    if (s.you !== undefined) S.myColor = s.you;
+    S.size = s.size || S.size;
+    S.rule = s.rule || S.rule;
+    S.version = s.version || S.version;
+    S.turn = s.turn || S.turn;
+    S.winner = s.winner || 0;
+    S.status = s.status || S.status;
+    S.players = (s.players !== undefined) ? s.players : S.players;
+    S.moves = (s.moves || []).map(function (t) { return [t[0], t[1], t[2]]; });
+    if (s.game) S.game = s.game;
+    S.scoreInfo = s.score || null;
+    if (S.status !== 'scoring') S.scoreMode = false;
+
+    render();
+    if (S.status === 'over' && !S.endShown) {
+      S.endShown = true;
+      var title = S.winner === 0 ? '平局' : (S.winner === S.myColor ? '你赢了！' : '对方赢了');
+      toast(title + '　点「再来一局」继续');
+    }
+  }
+
+  function render() {
+    var isChess = S.game === 'chess';
+    el.btnsChess.classList.toggle('hidden', !isChess);
+    if (isChess) {
+      el.roomChip.classList.add('hidden');
+      el.btns.classList.add('hidden');
+      el.btnsIn.classList.add('hidden');
+      el.btnsGo.classList.add('hidden');
+      el.dlRow.style.display = 'block';
+      el.tabs.classList.remove('hidden');
+      el.appTitle.textContent = '中国象棋 · 单机';
+      setStatus();
+      resize();
+      return;
+    }
+    // 房间号
+    if (S.inRoom) {
+      el.roomChip.classList.remove('hidden');
+      el.roomChip.textContent = '房间 ' + S.room;
+      el.btns.classList.add('hidden');
+      el.btnsIn.classList.remove('hidden');
+      el.dlRow.style.display = 'none';
+    } else {
+      el.roomChip.classList.add('hidden');
+      el.btns.classList.remove('hidden');
+      el.btnsIn.classList.add('hidden');
+      el.dlRow.style.display = 'block';
+    }
+    el.btnSize.textContent = S.size + ' 路';
+    el.appTitle.textContent = (S.game === 'go' ? '围棋' : '五子棋') + ' · 联机';
+    if (S.inRoom && S.game === 'go') {
+      el.btnsGo.classList.remove('hidden');
+      el.btnScore.textContent = S.scoreMode ? '确认数子' : '数子';
+    } else {
+      el.btnsGo.classList.add('hidden');
+    }
+    if (S.inRoom) el.tabs.classList.add('hidden'); else el.tabs.classList.remove('hidden');
+    setStatus();
+    resize();
+  }
+
+  function setGoStatus() {
+    var g = GoUI.sync(S.size, S.moves);
+    var mine = S.myColor === 1 ? '黑' : '白';
+    if (S.status === 'over') {
+      if (S.scoreInfo) {
+        var sc = S.scoreInfo;
+        el.status.textContent = (sc.winner === 0 ? '和棋'
+          : (sc.winner === S.myColor ? '你赢了' : '对方赢了'))
+          + '　黑 ' + sc.black + ' 目 · 白 ' + sc.white + ' 目';
+      } else {
+        el.status.textContent = S.winner === 0 ? '和棋'
+          : (S.winner === S.myColor ? '你赢了' : '对方赢了');
+      }
+    } else if (S.status === 'scoring') {
+      el.status.textContent = '双方都停手了 · 点「数子」确认终局';
+    } else if (S.players < 2) {
+      el.status.textContent = '等待对方进入房间';
+    } else if (S.scoreMode) {
+      el.status.textContent = '数子模式：点棋子标死子，再点「确认数子」';
+    } else if (S.turn === S.myColor) {
+      el.status.textContent = '轮到你落子';
+    } else {
+      el.status.textContent = '等待对方落子';
+    }
+    el.status.style.color = (S.status === 'over') ? '#E6EAF0' : '#D8A04A';
+    el.sub.textContent = '你执' + mine + ' · ' + S.players + '/2 人 · 第 ' + S.moves.length + ' 手'
+      + ' · 黑提 ' + g.capB + ' 白提 ' + g.capW
+      + (S.players < 2 ? ' · 把房间号发给对方' : '');
+  }
+
+  function setStatus() {
+    if (S.game === 'chess') {
+      var cs2 = ChessGame.status();
+      el.status.textContent = cs2.text;
+      el.status.style.color = ChessGame.state.over ? '#E6EAF0' : '#D8A04A';
+      el.sub.textContent = cs2.sub;
+      return;
+    }
+    if (!S.inRoom && S.game === 'go') {
+      el.status.textContent = '围棋 · 联机对下';
+      el.status.style.color = '#D8A04A';
+      el.sub.textContent = '开一间房，把房间号发给对方；19 路标准 / 13 路新手';
+      return;
+    }
+    if (S.game === 'go') { setGoStatus(); return; }
+    if (!S.inRoom) {
+      el.status.textContent = '选择一个玩法开始';
+      el.status.style.color = '#D8A04A';
+      el.sub.textContent = '可以让对方开房给你房间号，也可以自己开一间';
+      return;
+    }
+    if (S.status === 'over') {
+      el.status.textContent = S.winner === 0 ? '○ 平局'
+        : (S.winner === S.myColor ? '● 你赢了' : '○ 对方赢了');
+    } else if (S.players < 2) {
+      el.status.textContent = '● 等待对方进入房间';
+    } else if (S.busy) {
+      el.status.textContent = '… 正在落子';
+    } else if (S.turn === S.myColor) {
+      el.status.textContent = '● 轮到你落子';
+    } else {
+      el.status.textContent = '○ 等待对方落子';
+    }
+    el.status.style.color = (S.status === 'over') ? '#E6EAF0' : '#D8A04A';
+    el.sub.textContent = '你执' + (S.myColor === 1 ? '黑' : '白')
+      + ' · ' + S.players + '/2 人 · 第 ' + S.moves.length + ' 手'
+      + (S.players < 2 ? ' · 把房间号发给对方' : '');
+  }
+
+  // ---------- 流程 ----------
+  function copyText(text, okMsg) {
+    // 注意：不要用 window.prompt 兜底 —— 它会阻塞页面（真机上也会弹窗打断）。
+    // 复制失败就让用户点顶栏房间号再试一次，那里是明确的手势，成功率高。
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        toast(okMsg);
+      }).catch(function () {
+        toast('复制受限，点顶栏的房间号可再复制一次');
+      });
+    } else {
+      toast('复制受限，点顶栏的房间号可再复制一次');
+    }
+  }
+
+  function host() {
+    if (el.btnHost.disabled) return;
+    el.btnHost.disabled = true;
+    api('/api/create', { game: S.game, size: S.size, rule: 'loose' })
+      .then(function (s) {
+        el.btnHost.disabled = false;
+        if (s.ok === false) { toast(errText(s.error)); return; }
+        S.inRoom = true;
+        S.endShown = false;
+        apply(s);
+        pollStart();
+        copyText(S.room, '房间 ' + S.room + ' 已创建并复制，发给对方就行');
+      })
+      .catch(function (e) { el.btnHost.disabled = false; toast('开房失败：' + e.message); });
+  }
+
+  function join(code) {
+    var c = (code || '').trim().toUpperCase();
+    if (!c) return;
+    api('/api/join', { room: c })
+      .then(function (s) {
+        if (s.ok === false) { toast(errText(s.error)); return; }
+        S.inRoom = true;
+        S.endShown = false;
+        apply(s);
+        pollStart();
+        toast('已进入房间 ' + S.room);
+      })
+      .catch(function (e) { toast('加入失败：' + e.message); });
+  }
+
+  function again() {
+    if (S.busy) return;            // 防连点：否则会连着换好几次色
+    S.busy = true;
+    el.btnAgain.disabled = true;
+    setStatus();
+    api('/api/restart', { room: S.room, token: S.token, swap: true })
+      .then(function (s) {
+        S.busy = false;
+        el.btnAgain.disabled = false;
+        if (s.ok === false) { toast(errText(s.error)); setStatus(); return; }
+        if (s.token) S.token = s.token;
+        S.endShown = false;
+        apply(s);   // 服务端已按新颜色返回 you
+        toast(s.swapped ? '已重开，黑白互换' : '已重开');
+      })
+      .catch(function (e) {
+        S.busy = false;
+        el.btnAgain.disabled = false;
+        toast('重开失败：' + e.message);
+      });
+  }
+
+  function leave() {
+    pollStop();
+    S.inRoom = false; S.room = ''; S.token = ''; S.myColor = 0;
+    S.moves = []; S.status = ''; S.winner = 0; S.players = 0; S.version = 0;
+    S.endShown = false; S.scoreMode = false; S.scoreInfo = null;
+    try {
+      var u = new URL(location.href);
+      u.searchParams.delete('room');
+      history.replaceState(null, '', u.toString());
+    } catch (e) { }
+    render();
+  }
+
+  function inviteLink() {
+    var u = new URL(location.href);
+    u.searchParams.set('sharecode', SC);
+    u.searchParams.set('room', S.room);
+    return u.toString();
+  }
+
+  // ---------- 轮询 ----------
+  function pollStart() {
+    if (S.polling) return;
+    S.polling = true;
+    var since = S.version;
+    (function loop() {
+      if (!S.polling) return;
+      var url = '/api/state?room=' + encodeURIComponent(S.room)
+        + '&v=' + since + '&token=' + encodeURIComponent(S.token)
+        + '&sharecode=' + encodeURIComponent(SC);
+      fetch(url, { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (s) {
+          if (!S.polling) return;
+          if (s.ok === false) { setTimeout(loop, 1500); return; }
+          if ((s.version || 0) > since) {
+            since = s.version || 0;
+            apply(s);
+          }
+          loop();
+        })
+        .catch(function () {
+          if (!S.polling) return;
+          setTimeout(loop, 1500);
+        });
+    })();
+  }
+
+  function pollStop() { S.polling = false; }
+
+  function refresh() {
+    api('/api/state?room=' + encodeURIComponent(S.room) + '&v=0&token=' + encodeURIComponent(S.token))
+      .then(function (s) { if (s.ok !== false) apply(s); })
+      .catch(function () { });
+  }
+
+  // ---------- 弹窗 ----------
+  var dlgMode = 'join';
+  function openDialog(mode) {
+    dlgMode = mode;
+    el.dlgInput.value = '';
+    if (mode === 'join') {
+      el.dlgTitle.textContent = '加入房间';
+      el.dlgText.textContent = '输入对方给你的 6 位房间号';
+      el.dlgOk.textContent = '加入';
+    }
+    el.mask.classList.add('show');
+    setTimeout(function () { el.dlgInput.focus(); }, 60);
+  }
+  function closeDialog() { el.mask.classList.remove('show'); }
+
+  // ---------- 事件 ----------
+  el.btnHost.addEventListener('click', host);
+  el.btnJoin.addEventListener('click', function () { openDialog('join'); });
+  el.btnSize.addEventListener('click', function () {
+    if (S.inRoom) { toast('对局中不能换棋盘'); return; }
+    if (S.game === 'go') S.size = (S.size === 19) ? 13 : 19;
+    else S.size = (S.size === 15) ? 19 : 15;
+    render();
+  });
+  el.btnInvite.addEventListener('click', function () {
+    var link = inviteLink();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(function () {
+        toast('邀请链接已复制，发微信给对方');
+      }).catch(function () {
+        toast('复制受限，请手动复制地址栏链接');
+      });
+    } else {
+      toast('复制受限，请手动复制地址栏链接');
+    }
+  });
+  // ---------- 围棋动作 ----------
+  function switchGame(gname) {
+    if (S.inRoom) { toast('先退出当前房间'); return; }
+    if (gname !== 'chess') closeHistory();
+    if (gname === 'chess') {
+      S.game = 'chess';
+      el.tabGomoku.classList.remove('on');
+      el.tabGo.classList.remove('on');
+      el.tabChess.classList.add('on');
+      if (!chessStarted) { chessStarted = true; ChessGame.reset(); }
+      render();
+      return;
+    }
+    S.game = gname;
+    S.size = gname === 'go' ? 19 : 15;
+    S.scoreMode = false;
+    S.scoreInfo = null;
+    el.tabGomoku.classList.toggle('on', gname === 'gomoku');
+    el.tabGo.classList.toggle('on', gname === 'go');
+    el.tabChess.classList.remove('on');
+    render();
+  }
+
+  function goAction(path, bodyMsg) {
+    if (S.busy) return;
+    S.busy = true; setStatus();
+    api(path, { room: S.room, token: S.token }).then(function (s) {
+      S.busy = false;
+      if (s.ok === false) { toast(errText(s.error)); setStatus(); return; }
+      apply(s);
+      if (bodyMsg) toast(bodyMsg);
+    }).catch(function (e) {
+      S.busy = false; setStatus();
+      toast('网络出错：' + e.message);
+    });
+  }
+
+  function submitScore() {
+    var g = GoUI.sync(S.size, S.moves);
+    var sc = g.score();
+    api('/api/go-score', {
+      room: S.room, token: S.token,
+      black: sc.blackScore, white: sc.whiteScore
+    }).then(function (s) {
+      S.scoreMode = false;
+      if (s.ok === false) { toast(errText(s.error)); return; }
+      apply(s);
+      toast('数子完成：黑 ' + sc.blackScore + ' · 白 ' + sc.whiteScore);
+    }).catch(function (e) { toast('提交失败：' + e.message); });
+  }
+
+  el.tabGomoku.addEventListener('click', function () { switchGame('gomoku'); });
+  el.tabGo.addEventListener('click', function () { switchGame('go'); });
+  el.tabChess.addEventListener('click', function () { switchGame('chess'); });
+
+  // ---------- 象棋（单机） ----------
+  el.cNew.addEventListener('click', function () {
+    ChessGame.reset();
+    toast('新的一局，红方先行');
+  });
+  el.cUndo.addEventListener('click', function () {
+    if (!ChessGame.state.history.length) { toast('还没有走过棋'); return; }
+    ChessGame.undo();
+  });
+  el.cHint.addEventListener('click', function () {
+    if (ChessGame.state.over) { toast('本局已结束'); return; }
+    ChessGame.hint();
+    toast('正在计算一步好棋…');
+  });
+  el.cLevel.addEventListener('click', function () {
+    var lv = ChessGame.state.level % 4 + 1;
+    ChessGame.setLevel(lv);
+    el.cLevel.textContent = '难度 ' + ChessGame.levels[lv - 1].name;
+  });
+  el.cMode.addEventListener('click', function () {
+    var m = ChessGame.state.mode === 0 ? 1 : 0;
+    ChessGame.setMode(m);
+    el.cMode.textContent = m === 0 ? '人机对下' : '双人对下';
+    toast(m ? '双人：两人轮流在同一台设备上下' : '人机：你执红先行');
+  });
+  el.cResign.addEventListener('click', function () {
+    if (ChessGame.state.over) { toast('本局已结束'); return; }
+    ChessGame.resign();
+  });
+
+  // ---------- 象棋历史记录 ----------
+  var histRec = null, histIndex = 0;
+
+  function chessResultText(rec) {
+    if (!rec.winner) return '和';
+    if (rec.mode === 1) return rec.winner === 1 ? '红胜' : '黑胜';
+    return ((rec.winner === 1) === rec.humanRed) ? '胜' : '负';
+  }
+
+  function chessResultColor(rec) {
+    if (!rec.winner) return '#8B97A7';
+    if (rec.mode === 1) return '#D8A04A';
+    return ((rec.winner === 1) === rec.humanRed) ? '#5ABF7A' : '#E0605A';
+  }
+
+  function chessReasonName(reason) {
+    var m = { checkmate: '将死', stalemate: '困毙', resign: '认输', nocapture: '60 回合无吃子', repetition: '三次重复' };
+    return m[reason] || '';
+  }
+
+  function chessLevelName(lv) {
+    var L = ChessGame.levels;
+    return (L[lv - 1] || L[1]).name;
+  }
+
+  function fmtHistTime(ms) {
+    var d = new Date(ms);
+    function p2(n) { return n < 10 ? '0' + n : String(n); }
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+
+  function renderHistoryList() {
+    var recs = ChessGame.history();
+    el.histList.innerHTML = '';
+    if (!recs.length) {
+      el.histStats.textContent = '还没有对局记录';
+      var empty = document.createElement('div');
+      empty.className = 'histEmpty';
+      empty.textContent = '下完一局（含认输）就会自动存到这里，可以点开逐步复盘。';
+      el.histList.appendChild(empty);
+      return;
+    }
+    var win = 0, lose = 0, draw = 0, dual = 0;
+    recs.forEach(function (r) {
+      if (r.mode !== 0) { dual++; return; }
+      if (!r.winner) draw++;
+      else if ((r.winner === 1) === r.humanRed) win++;
+      else lose++;
+    });
+    el.histStats.textContent = '共 ' + recs.length + ' 局 · 人机 胜 ' + win + ' / 负 ' + lose + ' / 和 ' + draw +
+      (dual ? ' · 双人 ' + dual : '');
+
+    recs.forEach(function (rec) {
+      var row = document.createElement('div');
+      row.className = 'histRow';
+
+      var badge = document.createElement('div');
+      badge.className = 'histBadge';
+      badge.textContent = chessResultText(rec);
+      badge.style.color = chessResultColor(rec);
+      if (badge.textContent.length > 1) badge.style.fontSize = '11px';
+      row.appendChild(badge);
+
+      var main = document.createElement('div');
+      main.className = 'histMain';
+      var l1 = document.createElement('div');
+      l1.textContent = (rec.mode === 1 ? '双人' : '人机 · ' + chessLevelName(rec.level)) +
+        (chessReasonName(rec.reason) ? ' · ' + chessReasonName(rec.reason) : '');
+      var l2 = document.createElement('div');
+      l2.textContent = fmtHistTime(rec.t) + ' · ' + rec.moves.length + ' 手 · 点开复盘';
+      main.appendChild(l1);
+      main.appendChild(l2);
+      row.appendChild(main);
+
+      var del = document.createElement('button');
+      del.className = 'histDel';
+      del.textContent = '✕';
+      del.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        ChessGame.removeHistory(rec.t);
+        renderHistoryList();
+      });
+      row.appendChild(del);
+
+      row.addEventListener('click', function () { openHistReplay(rec); });
+      el.histList.appendChild(row);
+    });
+  }
+
+  function openHistory() {
+    renderHistoryList();
+    el.histListView.classList.remove('hidden');
+    el.histReplayView.classList.add('hidden');
+    el.histTitle.textContent = '象棋 · 历史记录';
+    el.histMask.classList.add('show');
+  }
+
+  function closeHistory() {
+    el.histMask.classList.remove('show');
+    histRec = null;
+  }
+
+  function openHistReplay(rec) {
+    histRec = rec;
+    histIndex = rec.moves.length;
+    el.histListView.classList.add('hidden');
+    el.histReplayView.classList.remove('hidden');
+    el.histTitle.textContent = '复盘 · 共 ' + rec.moves.length + ' 手';
+    renderHistReplay();
+  }
+
+  function renderHistReplay() {
+    if (!histRec) return;
+    var maxW = Math.min(360, window.innerWidth - 80);
+    var maxH = Math.floor(window.innerHeight * 0.46);
+    var sideCss = Math.max(180, Math.min(maxW, maxH));
+    var hdpr = window.devicePixelRatio || 1;
+    el.histCanvas.width = Math.floor(sideCss * hdpr);
+    el.histCanvas.height = Math.floor(sideCss * hdpr);
+    el.histCanvas.style.width = sideCss + 'px';
+    el.histCanvas.style.height = sideCss + 'px';
+
+    var c = el.histCanvas.getContext('2d');
+    c.setTransform(hdpr, 0, 0, hdpr, 0, 0);
+    var board = ChessGame.boardAt(histRec.moves, histIndex);
+    var last = histIndex > 0 ? histRec.moves[histIndex - 1] : null;
+    ChessGame.drawSnapshot(c, sideCss, board, last ? last[0] : -1, last ? last[1] : -1);
+
+    var notes = ChessGame.notesAt(histRec.moves, histIndex);
+    var lastNote = notes.length ? ' · ' + notes[notes.length - 1] : '';
+    var reason = chessReasonName(histRec.reason);
+    el.histReplayInfo.textContent = '第 ' + histIndex + ' / ' + histRec.moves.length + ' 手 · ' +
+      chessResultText(histRec) + (reason ? ' · ' + reason : '') + lastNote;
+    el.histPrev.disabled = histIndex <= 0;
+    el.histNext.disabled = histIndex >= histRec.moves.length;
+  }
+
+  el.cHistory.addEventListener('click', openHistory);
+  el.histClose.addEventListener('click', closeHistory);
+  el.histMask.addEventListener('click', function (e) {
+    if (e.target === el.histMask) closeHistory();
+  });
+  el.histClear.addEventListener('click', function () {
+    var recs = ChessGame.history();
+    if (!recs.length) { toast('还没有记录'); return; }
+    if (!window.confirm('确定清空全部象棋历史记录？')) return;
+    ChessGame.clearHistory();
+    renderHistoryList();
+    toast('已清空');
+  });
+  el.histPrev.addEventListener('click', function () {
+    if (!histRec || histIndex <= 0) return;
+    histIndex--;
+    renderHistReplay();
+  });
+  el.histNext.addEventListener('click', function () {
+    if (!histRec || histIndex >= histRec.moves.length) return;
+    histIndex++;
+    renderHistReplay();
+  });
+  el.histBack.addEventListener('click', function () {
+    el.histReplayView.classList.add('hidden');
+    el.histListView.classList.remove('hidden');
+    el.histTitle.textContent = '象棋 · 历史记录';
+    renderHistoryList();
+  });
+
+  el.btnPass.addEventListener('click', function () {
+    if (S.status === 'over') { toast('本局已结束'); return; }
+    if (S.status === 'scoring') { toast('已经进入数子阶段，不能再弃手'); return; }
+    if (S.turn !== S.myColor) { toast('还没轮到你'); return; }
+    goAction('/api/pass', '已弃一手');
+  });
+  el.btnResign.addEventListener('click', function () {
+    if (S.status === 'over') { toast('本局已结束'); return; }
+    if (S.status === 'scoring') { toast('已经进入数子阶段，不能认输'); return; }
+    goAction('/api/resign', '你已认输');
+  });
+  el.btnScore.addEventListener('click', function () {
+    if (S.status === 'over') { toast('本局已结束'); return; }
+    if (S.status !== 'scoring' && !S.scoreMode) {
+      toast('双方都停手后才能数子');
+      return;
+    }
+    if (!S.scoreMode) {
+      S.scoreMode = true;
+      GoUI.sync(S.size, S.moves).dead = {};
+      render();
+      toast('点棋盘上的死子做标记，标完点「确认数子」');
+    } else {
+      submitScore();
+    }
+  });
+
+  el.btnAgain.addEventListener('click', again);
+  el.btnLeave.addEventListener('click', leave);
+  el.roomChip.addEventListener('click', function () {
+    if (!S.room) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(S.room).then(function () { toast('房间号已复制'); })
+        .catch(function () { toast('复制受限，请手动记下：' + S.room); });
+    } else {
+      toast('请手动记下房间号：' + S.room);
+    }
+  });
+  el.dlgOk.addEventListener('click', function () {
+    var v = el.dlgInput.value;
+    closeDialog();
+    if (dlgMode === 'join') join(v);
+  });
+  el.dlgCancel.addEventListener('click', closeDialog);
+  el.dlgInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { el.dlgOk.click(); }
+  });
+  el.mask.addEventListener('click', function (e) {
+    if (e.target === el.mask) closeDialog();
+  });
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', function () { setTimeout(resize, 120); });
+
+  // ---------- 启动 ----------
+  ChessGame.setOnUpdate(function () {
+    if (S.game !== 'chess') return;
+    setStatus();
+    draw();
+  });
+  var startRoom = params.get('room');
+  var scQuery = SC ? ('?sharecode=' + encodeURIComponent(SC)) : '';
+  el.apkLink.href = 'gomoku.apk' + scQuery;
+  el.winLink.href = 'gomoku-windows.exe' + scQuery;
+  el.readmeLink.href = 'gomoku-windows-readme.txt' + scQuery;
+  if (params.get('game') === 'chess') {
+    S.game = 'chess'; chessStarted = true; ChessGame.reset();
+    el.tabGomoku.classList.remove('on');
+    el.tabGo.classList.remove('on');
+    el.tabChess.classList.add('on');
+  } else if (params.get('game') === 'go') {
+    S.game = 'go'; S.size = 19;
+    el.tabGomoku.classList.remove('on');
+    el.tabGo.classList.add('on');
+  }
+  render();
+  if (startRoom) {
+    join(startRoom);
+  }
+})();
+</script>
+</body>
+</html>
