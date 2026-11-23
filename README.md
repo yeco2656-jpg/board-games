@@ -14,7 +14,7 @@
 - **围棋**：人机 / 双人 / AI 观战，远程联机，数子与死子标记，内置教学。
 - **中国象棋**：人机 / 双人，四档 AI 难度，悔棋、提示、认输，标准中文记谱（如「炮二平五」），对局历史与逐步复盘。三端都是单机，不接远程联机。
 
-本仓库同时是网页端的静态托管与两个客户端的下载入口；线上托管版仍在 WorkBuddy（`https://gomoku-online-04516.app.workbuddy.host/`），GitHub Pages 是独立备份。
+本仓库是网页端的主入口与两个客户端的下载地址：<https://yeco2656-jpg.github.io/board-games/>。Pages 是纯静态托管，人机与双人模式可用；**开房联机需要服务端**，这部分仍走 WorkBuddy 版（`https://gomoku-online-04516.app.workbuddy.host/`）或自建 `tools/server.js`。
 
 ## 二、怎么用
 
